@@ -118,29 +118,26 @@ class Process implements Runnable {
     public void run() {
         // TODO #3: Acquire CPU semaphore before executing
         // This ensures only allowed number of processes run simultaneously
-
         try {
-            // Task 3: Acquire CPU semaphore before executing
+            // Task 3: الحصول على تصريح المعالج (Semaphore) قبل البدء
             SharedResources.cpuSemaphore.acquire();
 
             if (startTime == -1) {
                 startTime = System.currentTimeMillis();
             }
 
-            SharedResources.incrementContextSwitch();
-
-            // Increment context switch counter
+            // Task 1: زيادة عداد التبديل (مرة واحدة فقط)
             SharedResources.incrementContextSwitch();
 
             int runTime = Math.min(timeQuantum, remainingTime);
 
-            String quantumBar = createProgressBar(0, 15);
             String message = "  ▶ " + name + " (Priority: " + priority + ") executing quantum [" + runTime + "ms]";
             System.out.println(Colors.BRIGHT_GREEN + message + Colors.RESET);
 
-            // Log execution
+            // Task 2: تسجيل التنفيذ في السجل المحمي
             SharedResources.logExecution(name + " started quantum execution");
 
+            // تنفيذ خطوات الكوانتم (Quantum steps)
             try {
                 int steps = 5;
                 int stepTime = runTime / steps;
@@ -148,18 +145,13 @@ class Process implements Runnable {
                 for (int i = 1; i <= steps; i++) {
                     Thread.sleep(stepTime);
                     int quantumProgress = (i * 100) / steps;
-                    quantumBar = createProgressBar(quantumProgress, 15);
+                    String quantumBar = createProgressBar(quantumProgress, 15);
                     System.out.print("\r  " + Colors.YELLOW + "⚡" + Colors.RESET +
                             " Quantum progress: " + quantumBar);
                 }
                 System.out.println();
-
             } catch (InterruptedException e) {
-                // هذا الجزء هو الذي يحل مشكلة الخطأ في acquire()
-                System.out.println(Colors.RED + "  ✗ " + name + " failed to acquire CPU." + Colors.RESET);
-            } finally {
-                // Task 4: Release CPU semaphore
-                SharedResources.cpuSemaphore.release();
+                System.out.println(Colors.RED + "\n  ✗ " + name + " was interrupted during sleep." + Colors.RESET);
             }
 
             remainingTime -= runTime;
@@ -178,20 +170,22 @@ class Process implements Runnable {
             } else {
                 completionTime = System.currentTimeMillis();
                 long waitingTime = (completionTime - creationTime) - burstTime;
+
+                // Task 1: حماية تحديث الوقت والعمليات المنتهية
                 SharedResources.addWaitingTime(waitingTime);
                 SharedResources.incrementCompletedProcess();
+
                 SharedResources.logExecution(name + " completed execution");
                 System.out.println(Colors.BRIGHT_GREEN + "  ✓ " + Colors.BOLD + Colors.CYAN + name +
-                        Colors.RESET + Colors.BRIGHT_GREEN + " finished execution!" +
-                        Colors.RESET);
+                        Colors.RESET + Colors.BRIGHT_GREEN + " finished execution!" + Colors.RESET);
             }
             System.out.println();
 
         } catch (InterruptedException e) {
-
-            System.out.println(Colors.RED + "  ✗ " + name + " failed to acquire CPU." + Colors.RESET);
+            // معالجة الخطأ الخاص بطلب السيمفور (acquire)
+            System.out.println(Colors.RED + "  ✗ " + name + " failed to acquire CPU resources." + Colors.RESET);
         } finally {
-            // Task 3:
+            // Task 3: تحرير السيمفور دائماً في الـ finally لضمان عدم حدوث Deadlock
             SharedResources.cpuSemaphore.release();
         }
     }
