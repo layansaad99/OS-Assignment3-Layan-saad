@@ -73,7 +73,7 @@ class SharedResources {
         // Protect completed process counter
         lock.lock();
         try {
-            completedProcessCount++;
+            totalWaitingTime += time;
         } finally {
             lock.unlock();
         }
@@ -89,7 +89,7 @@ class SharedResources {
             lock.unlock();
         }
         // RACE CONDITION: ArrayList is not thread-safe!
-        executionLog.add(message);
+
     }
 }
 
@@ -120,9 +120,14 @@ class Process implements Runnable {
         // This ensures only allowed number of processes run simultaneously
 
         try {
+            // Task 3: Acquire CPU semaphore before executing
+            SharedResources.cpuSemaphore.acquire();
+
             if (startTime == -1) {
                 startTime = System.currentTimeMillis();
             }
+
+            SharedResources.incrementContextSwitch();
 
             // Increment context switch counter
             SharedResources.incrementContextSwitch();
@@ -150,7 +155,11 @@ class Process implements Runnable {
                 System.out.println();
 
             } catch (InterruptedException e) {
-                System.out.println(Colors.RED + "\n  ✗ " + name + " was interrupted." + Colors.RESET);
+                // هذا الجزء هو الذي يحل مشكلة الخطأ في acquire()
+                System.out.println(Colors.RED + "  ✗ " + name + " failed to acquire CPU." + Colors.RESET);
+            } finally {
+                // Task 4: Release CPU semaphore
+                SharedResources.cpuSemaphore.release();
             }
 
             remainingTime -= runTime;
@@ -178,9 +187,12 @@ class Process implements Runnable {
             }
             System.out.println();
 
+        } catch (InterruptedException e) {
+
+            System.out.println(Colors.RED + "  ✗ " + name + " failed to acquire CPU." + Colors.RESET);
         } finally {
-            // TODO #4: Release CPU semaphore here
-            // Always release in finally block to prevent deadlocks!
+            // Task 3:
+            SharedResources.cpuSemaphore.release();
         }
     }
 
